@@ -58,6 +58,7 @@ class BasicBlock(nn.Module):
 
 
 class Bottleneck(nn.Module):
+
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, 
@@ -65,6 +66,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        # 这里它用到了padding，用零填充，所以得到的h和w还是不变的
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
                                padding=dilation, bias=False, dilation=dilation)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)

@@ -141,7 +141,9 @@ _C.RESCORE.DATA_FILE = 'data/rescore_data/rescore_dataset_train_coco_kpt'
 
 def update_config(cfg, args):
     cfg.defrost()
+    # 合并自定义文件
     cfg.merge_from_file(args.cfg)
+    # 合并自定义的参数
     cfg.merge_from_list(args.opts)
 
     if not os.path.exists(cfg.DATASET.ROOT):

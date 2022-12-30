@@ -80,6 +80,7 @@ def main():
     update_config(cfg, args)
 
     cfg.defrost()
+    # 用于分布式训练的一个参数
     cfg.RANK = args.rank
     cfg.freeze()
 
@@ -99,6 +100,7 @@ def main():
 
     args.distributed = args.world_size > 1 or cfg.MULTIPROCESSING_DISTRIBUTED
 
+    # 查看GPU的数量
     ngpus_per_node = torch.cuda.device_count()
     if cfg.MULTIPROCESSING_DISTRIBUTED:
         # Since we have ngpus_per_node processes per node, the total world_size
@@ -126,6 +128,7 @@ def main_worker(
         gpu, ngpus_per_node, args, final_output_dir, tb_log_dir
 ):
     # cudnn related setting
+    # 如果网络的输入数据维度或类型上变化不大，设置这个可以增加运行效率
     cudnn.benchmark = cfg.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = cfg.CUDNN.ENABLED
@@ -171,6 +174,7 @@ def main_worker(
             final_output_dir
         )
 
+    # 日志相关
     writer_dict = {
         'writer': SummaryWriter(logdir=tb_log_dir),
         'train_global_steps': 0,
@@ -233,6 +237,8 @@ def main_worker(
         final_output_dir, 'checkpoint.pth.tar')
     if cfg.AUTO_RESUME and os.path.exists(checkpoint_file):
         logger.info("=> loading checkpoint '{}'".format(checkpoint_file))
+        # 使用函数将所有张量加载到CPU（改方式适用在GPU训练的模型在CPU上加载）
+        # 参考：https://www.jianshu.com/p/939de37f73e7
         checkpoint = torch.load(checkpoint_file, 
                         map_location=lambda storage, loc: storage)
         begin_epoch = checkpoint['epoch']
@@ -243,7 +249,7 @@ def main_worker(
         optimizer.load_state_dict(checkpoint['optimizer'])
         logger.info("=> loaded checkpoint '{}' (epoch {})".format(
             checkpoint_file, checkpoint['epoch']))
-
+    # 用于在训练中调整学习率
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, cfg.TRAIN.LR_STEP, cfg.TRAIN.LR_FACTOR,
         last_epoch=last_epoch

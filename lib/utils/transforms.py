@@ -162,6 +162,17 @@ def resize(image, input_size):
 
 
 def get_multi_scale_size(image, input_size, current_scale, min_scale):
+    """
+    返回一个新的尺寸的矩阵
+    Args:
+        image: 实际图片
+        input_size: 设定的输入尺寸
+        current_scale:
+        min_scale:
+
+    Returns: center：原图的中心点
+
+    """
     h, w, _ = image.shape
     center = np.array([int(w / 2.0 + 0.5), int(h / 2.0 + 0.5)])
 

@@ -61,19 +61,29 @@ class PoseHigherResolutionNet(nn.Module):
             setattr(self, 'stage{}'.format(i+2), stage)
 
         # build head net
+        # 计算骨干网络的输出的通道数
         inp_channels = int(sum(self.stages_spec.NUM_CHANNELS[-1]))
+        # 热图的配置信息
         config_heatmap = self.spec.HEAD_HEATMAP
+        # 偏移量的配置信息
         config_offset = self.spec.HEAD_OFFSET
+        # 关节点数量
         self.num_joints = cfg.DATASET.NUM_JOINTS
+        # 偏移量的通道数量
         self.num_offset = self.num_joints * 2
+        # 关节点加中心点的数量（热图数量）
         self.num_joints_with_center = self.num_joints+1
+        # 每个分支输入的通道数
         self.offset_prekpt = config_offset['NUM_CHANNELS_PERKPT']
-        
+
+        # 检测头一共需要多少通道数
         offset_channels = self.num_joints*self.offset_prekpt
+        # 调整输入通道的层
         self.transition_heatmap = self._make_transition_for_head(
                     inp_channels, config_heatmap['NUM_CHANNELS'])
         self.transition_offset = self._make_transition_for_head(
                     inp_channels, offset_channels)
+
         self.head_heatmap = self._make_heatmap_head(config_heatmap)
         self.offset_feature_layers, self.offset_final_layer = \
             self._make_separete_regression_head(config_offset)
@@ -138,7 +148,22 @@ class PoseHigherResolutionNet(nn.Module):
 
     def _make_layer(
             self, block, inplanes, planes, blocks, stride=1, dilation=1):
+        """
+
+        Args:
+            block:每个 layer 里面使用的 block，可以是 BasicBlock，Bottleneck
+            inplanes:
+            planes:输出的通道数
+            blocks:一个整数，表示该层 layer 有多少个 block
+            stride: 第一个 block 的卷积层的 stride，默认为 1。注意，只有在每个 layer 的第一个 block 的第一个卷积层使用该参数。
+            dilation:
+
+        Returns:
+
+        """
         downsample = None
+        # 判断 stride 是否为 1，输入通道和输出通道是否相等。如果这两个条件都不成立，那么表明需要建立一个 1 X 1 的卷积层，来改变通道数和改变图片大小。
+        # 如果 stride不等于1，那么在建立bottleneck时,stride也是1，那么残差得出的 w和h就变化了，那么也需要把通过downsample的w和h处理一下，变为一致
         if stride != 1 or inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(inplanes, planes * block.expansion,
@@ -152,7 +177,7 @@ class PoseHigherResolutionNet(nn.Module):
         inplanes = planes * block.expansion
         for _ in range(1, blocks):
             layers.append(block(inplanes, planes, dilation=dilation))
-
+        # * 指的是python中传参解压功能
         return nn.Sequential(*layers)
 
     def _make_transition_layer(
@@ -276,6 +301,7 @@ class PoseHigherResolutionNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+        # 给可形变卷积中的卷积核和偏移量单独做参数初始化。
         for m in self.modules():
             if hasattr(m, 'transform_matrix_conv'):
                 nn.init.constant_(m.transform_matrix_conv.weight, 0)
@@ -289,7 +315,8 @@ class PoseHigherResolutionNet(nn.Module):
         parameters_names = set()
         for name, _ in self.named_parameters():
             parameters_names.add(name)
-
+        # 模型中需要保存下来的参数包括两种:一种是反向传播需要被optimizer更新的，称之为 parameter
+        # 一种是反向传播不需要被optimizer更新，称之为 buffer
         buffers_names = set()
         for name, _ in self.named_buffers():
             buffers_names.add(name)
@@ -309,6 +336,7 @@ class PoseHigherResolutionNet(nn.Module):
                                 '=> init {} from {}'.format(name, pretrained)
                             )
                         need_init_state_dict[name] = m
+            # 使用预训练权重加载模型。
             self.load_state_dict(need_init_state_dict, strict=False)
 
 

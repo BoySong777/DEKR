@@ -11,12 +11,15 @@ from __future__ import division
 from __future__ import print_function
 
 import torch.utils.data
-
+# 测试用
 from .COCODataset import CocoDataset as coco
 from .COCODataset import CocoRescoreDataset as rescore_coco
+# 训练用
 from .COCOKeypoints import CocoKeypoints as coco_kpt
+# 测试用
 from .CrowdPoseDataset import CrowdPoseDataset as crowd_pose
 from .CrowdPoseDataset import CrowdPoseRescoreDataset as rescore_crowdpose
+# 训练用
 from .CrowdPoseKeypoints import CrowdPoseKeypoints as crowd_pose_kpt
 from .transforms import build_transforms
 from .target_generators import HeatmapGenerator
@@ -24,10 +27,21 @@ from .target_generators import OffsetGenerator
 
 
 def build_dataset(cfg, is_train):
+    """
+    该函数用来完成dataset实例化。
+    Args:
+        cfg:
+        is_train:
+
+    Returns:
+
+    """
     assert is_train is True, 'Please only use build_dataset for training.'
 
+    # 对图片进行一些变换操作，如翻转，仿射变换等。
     transforms = build_transforms(cfg, is_train)
 
+    #
     heatmap_generator = HeatmapGenerator(
         cfg.DATASET.OUTPUT_SIZE, cfg.DATASET.NUM_JOINTS
     )
@@ -49,11 +63,15 @@ def build_dataset(cfg, is_train):
 
 def make_dataloader(cfg, is_train=True, distributed=False):
     if is_train:
+        # 每块GPU一次处理多少张图片
+        # 也就是说每一次计算，计算多少张图片，这个和batch还不一样。
         images_per_gpu = cfg.TRAIN.IMAGES_PER_GPU
+        # 将数据集打乱
         shuffle = True
     else:
         images_per_gpu = cfg.TEST.IMAGES_PER_GPU
         shuffle = False
+    # 每一个batch可以处理多少张图片，计算方式是每块GPU上处理的照片数量 乘以 GPU的块数。
     images_per_batch = images_per_gpu * len(cfg.GPUS)
 
     dataset = build_dataset(cfg, is_train)
@@ -70,7 +88,7 @@ def make_dataloader(cfg, is_train=True, distributed=False):
         dataset,
         batch_size=images_per_batch,
         shuffle=shuffle,
-        num_workers=cfg.WORKERS,
+        num_workers=cfg.WORKERS, # 多线程处理数据
         pin_memory=cfg.PIN_MEMORY,
         sampler=train_sampler
     )

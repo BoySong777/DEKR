@@ -90,6 +90,7 @@ CROWDPOSE_KEYPOINT_INDEXES = {
 
 def get_pose_estimation_prediction(cfg, model, image, vis_thre, transforms):
     # size at scale 1.0
+    # 这一步好像是在重构照片的宽高比，和像素大小
     base_size, center, scale = get_multi_scale_size(
         image, cfg.DATASET.INPUT_SIZE, 1.0, 1.0
     )
@@ -102,10 +103,12 @@ def get_pose_estimation_prediction(cfg, model, image, vis_thre, transforms):
             image_resized, center, scale_resized = resize_align_multi_scale(
                 image, cfg.DATASET.INPUT_SIZE, scale, 1.0
             )
-
+            #图片转为tensor
             image_resized = transforms(image_resized)
+            # 变成 B*C*H*W
             image_resized = image_resized.unsqueeze(0).cuda()
 
+            # 预测
             heatmap, posemap = get_multi_stage_outputs(
                 cfg, model, image_resized, cfg.TEST.FLIP_TEST
             )
@@ -138,7 +141,17 @@ def get_pose_estimation_prediction(cfg, model, image, vis_thre, transforms):
 
 
 def prepare_output_dirs(prefix='/output/'):
+    """
+    准备输出文件夹，也就是创建一个存放输出文件的文件夹。
+    Args:
+        prefix: 输出文件夹的名字
+
+    Returns:
+
+    """
+    # 输出文件夹中创建一个文件夹叫pose
     pose_dir = os.path.join(prefix, "pose")
+    #
     if os.path.exists(pose_dir) and os.path.isdir(pose_dir):
         shutil.rmtree(pose_dir)
     os.makedirs(pose_dir, exist_ok=True)
@@ -152,6 +165,7 @@ def parse_args():
     parser.add_argument('--videoFile', type=str, required=True)
     parser.add_argument('--outputDir', type=str, default='/output/')
     parser.add_argument('--inferenceFps', type=int, default=10)
+    # ？？
     parser.add_argument('--visthre', type=float, default=0)
     parser.add_argument('opts',
                         help='Modify config options using the command-line',
@@ -170,8 +184,11 @@ def parse_args():
 
 def main():
     # transformation
+    # torchvision.transforms是pytorch中的图像预处理包。一般用Compose把多个步骤整合到一起
     pose_transform = transforms.Compose([
+        # transforms.ToTensor()函数的作用是将原始的PILImage格式或者numpy.array格式的数据格式化为可被pytorch快速处理的张量类型
         transforms.ToTensor(),
+        # 数据标准化—transforms.Normalize,功能：逐channel的对图像进行标准化
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
@@ -183,49 +200,62 @@ def main():
 
     args = parse_args()
     update_config(cfg, args)
-    pose_dir = prepare_output_dirs(args.outputDir)
-    csv_output_rows = []
 
+    # 输出文件存放的路径。
+    pose_dir = prepare_output_dirs(args.outputDir)
+    #一种输出值
+    csv_output_rows = []
+    # 获取模型 models.hrnet_dekr.get_pose_net
     pose_model = eval('models.'+cfg.MODEL.NAME+'.get_pose_net')(
         cfg, is_train=False
     )
-
+    #
     if cfg.TEST.MODEL_FILE:
         print('=> loading model from {}'.format(cfg.TEST.MODEL_FILE))
+        # 模型加载其权重文件
         pose_model.load_state_dict(torch.load(
             cfg.TEST.MODEL_FILE), strict=False)
     else:
         raise ValueError('expected model defined in config at TEST.MODEL_FILE')
 
+    # 把模型放到GPU上
     pose_model.to(CTX)
     pose_model.eval()
 
     # Loading an video
     vidcap = cv2.VideoCapture(args.videoFile)
+    # 获取视频每秒的帧数
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     if fps < args.inferenceFps:
         raise ValueError('desired inference fps is ' +
                          str(args.inferenceFps)+' but video fps is '+str(fps))
     skip_frame_cnt = round(fps / args.inferenceFps)
+    # 视频流中帧的宽度
     frame_width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    # 视频流中帧的高度
     frame_height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # 用于保存处理后的视频，第一个参数指的是保存的路径。
     outcap = cv2.VideoWriter('{}/{}_pose.avi'.format(args.outputDir, os.path.splitext(os.path.basename(args.videoFile))[0]),
                              cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), int(skip_frame_cnt), (frame_width, frame_height))
 
     count = 0
     while vidcap.isOpened():
         total_now = time.time()
+        # 读取一帧照片，
         ret, image_bgr = vidcap.read()
         count += 1
-
+        # 如果ret为False，那么说明已经读到尾部了
         if not ret:
             break
-
+        # 这个跳帧处理，每隔多少帧来取一张照片。
         if count % skip_frame_cnt != 0:
             continue
 
+        # 转换读出来的照片数据。
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
+        # 复制一份数据
         image_pose = image_rgb.copy()
 
         # Clone 1 image for debugging purpose

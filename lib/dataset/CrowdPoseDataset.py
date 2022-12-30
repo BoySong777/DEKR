@@ -105,7 +105,7 @@ class CrowdPoseDataset(Dataset):
 
     def __len__(self):
         return len(self.ids)
-
+    # 这个__repr__相当于 java中的tostring
     def __repr__(self):
         fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
         fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())

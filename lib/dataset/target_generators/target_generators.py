@@ -23,11 +23,14 @@ class HeatmapGenerator():
         return g
 
     def __call__(self, joints, sgm, ct_sgm, bg_weight=1.0):
+        # joints的shape应该是 人数*关节点数*2（猜测）
         assert self.num_joints_with_center == joints.shape[1], \
             'the number of joints should be %d' % self.num_joints_with_center
 
         hms = np.zeros((self.num_joints_with_center, self.output_res, self.output_res),
                        dtype=np.float32)
+        # 这个是在弄关键点的权重，在关键点周围权重为1
+        # 初始值全部初始化为2
         ignored_hms = 2*np.ones((self.num_joints_with_center, self.output_res, self.output_res),
                                     dtype=np.float32)
 
@@ -39,12 +42,14 @@ class HeatmapGenerator():
                     sigma = sgm
                 else:
                     sigma = ct_sgm
+                # 判断关键点的可见性
                 if pt[2] > 0:
                     x, y = pt[0], pt[1]
+                    # 判断关键点是否为正常值
                     if x < 0 or y < 0 or \
                             x >= self.output_res or y >= self.output_res:
                         continue
-
+                    #求出进行高斯平滑的范围，以关节点为中心点
                     ul = int(np.floor(x - 3 * sigma - 1)
                              ), int(np.floor(y - 3 * sigma - 1))
                     br = int(np.ceil(x + 3 * sigma + 2)
@@ -63,6 +68,7 @@ class HeatmapGenerator():
                         hms_list[0][idx, aa:bb, cc:dd], joint_rg)
                     hms_list[1][idx, aa:bb, cc:dd] = 1.
 
+        # 将剩余的权重的改为指定权重。
         hms_list[1][hms_list[1] == 2] = bg_weight
 
         return hms_list
@@ -77,6 +83,15 @@ class OffsetGenerator():
         self.radius = radius
 
     def __call__(self, joints, area):
+        """
+
+        Args:
+            joints: 关节点位置
+            area: 人的一个面积的平方
+
+        Returns: 人的每个关节点的偏移量，和一个相对应位置的一个权重，权重是这个人面积的倒数。
+
+        """
         assert joints.shape[1] == self.num_joints_with_center, \
             'the number of joints should be 18, 17 keypoints + 1 center joint.'
 
@@ -94,7 +109,7 @@ class OffsetGenerator():
             if ct_v < 1 or ct_x < 0 or ct_y < 0 \
                     or ct_x >= self.output_w or ct_y >= self.output_h:
                 continue
-
+            # 从头开始遍历，遍历到最后一个（不包含最后一个）为止
             for idx, pt in enumerate(p[:-1]):
                 if pt[2] > 0:
                     x, y = pt[0], pt[1]
@@ -113,6 +128,8 @@ class OffsetGenerator():
                             offset_y = pos_y - y
                             if offset_map[idx*2, pos_y, pos_x] != 0 \
                                     or offset_map[idx*2+1, pos_y, pos_x] != 0:
+                                # 如果这个位置已经有值了，且这个值对应的人的面积小于当前的人的面积，这这个值就不变了，
+                                # 这说明，如果一个位置被两个人占用，那么就让面积小的人占用
                                 if area_map[pos_y, pos_x] < area[person_id]:
                                     continue
                             offset_map[idx*2, pos_y, pos_x] = offset_x

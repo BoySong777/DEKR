@@ -12,7 +12,7 @@ CUDNN:
 DATASET:
   DATASET: crowd_pose_kpt
   DATASET_TEST: crowd_pose
-  DATA_FORMAT: zip
+  DATA_FORMAT: jpg
   FLIP: 0.5
   INPUT_SIZE: 640
   OUTPUT_SIZE: 160

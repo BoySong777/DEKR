@@ -53,13 +53,17 @@ class MultiLossFactory(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
+        # 肢体个数
         self.num_joints = cfg.MODEL.NUM_JOINTS
+        #反例的权重（正例的权重为1）
         self.bg_weight = cfg.DATASET.BG_WEIGHT
 
         self.heatmap_loss = HeatmapLoss() if cfg.LOSS.WITH_HEATMAPS_LOSS else None
+        # 热图损失所占的权重
         self.heatmap_loss_factor = cfg.LOSS.HEATMAPS_LOSS_FACTOR
 
         self.offset_loss = OffsetsLoss() if cfg.LOSS.WITH_OFFSETS_LOSS else None
+        # 偏移量损失所占的权重
         self.offset_loss_factor = cfg.LOSS.OFFSETS_LOSS_FACTOR
 
     def forward(self, output, poffset, heatmap, mask, offset, offset_w):

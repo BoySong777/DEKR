@@ -18,8 +18,9 @@ from utils.utils import AverageMeter
 
 def do_train(cfg, model, data_loader, loss_factory, optimizer, epoch,
              output_dir, tb_log_dir, writer_dict):
+    # 日志
     logger = logging.getLogger("Training")
-
+    # AverageMeter是一个存放值的一个类，用于计算值的平均，总数，以及个数
     batch_time = AverageMeter()
     data_time = AverageMeter()
 

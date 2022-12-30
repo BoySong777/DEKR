@@ -12,7 +12,7 @@ CUDNN:
 DATASET:
   DATASET: crowd_pose_kpt
   DATASET_TEST: crowd_pose
-  DATA_FORMAT: zip
+  DATA_FORMAT: jpg
   FLIP: 0.5
   INPUT_SIZE: 512
   OUTPUT_SIZE: 128
@@ -23,7 +23,7 @@ DATASET:
   MAX_TRANSLATE: 40
   MIN_SCALE: 0.75
   NUM_JOINTS: 14
-  ROOT: 'data/crowdpose'
+  ROOT: 'data/crowdpose/user_test'
   TEST: test
   TRAIN: trainval
   OFFSET_RADIUS: 4

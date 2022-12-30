@@ -34,6 +34,15 @@ def get_locations(output_h, output_w, device):
 
 
 def get_reg_poses(offset, num_joints):
+    """
+    感觉这个函数好像是在把每个位置的偏移量换成每一个位置的对应坐标位置。
+    Args:
+        offset:
+        num_joints:
+
+    Returns:
+
+    """
     _, h, w = offset.shape
     offset = offset.permute(1, 2, 0).reshape(h*w, num_joints, 2)
     locations = get_locations(h, w, offset.device)
@@ -51,7 +60,8 @@ def offset_to_pose(offset, flip=True, flip_index=None):
     if flip:
         reg_poses = reg_poses[:, flip_index, :]
         reg_poses[:, :, 0] = w - reg_poses[:, :, 0] - 1
-
+    # contiguous()使两个相关联的数据断开关联成为一个独立的数据，
+    # 详见：https://blog.csdn.net/kdongyi/article/details/108180250
     reg_poses = reg_poses.contiguous().view(h*w, 2*num_joints).permute(1,0)
     reg_poses = reg_poses.contiguous().view(1,-1,h,w).contiguous()
 
