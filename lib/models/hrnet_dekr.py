@@ -49,6 +49,8 @@ class PoseHigherResolutionNet(nn.Module):
         self.stages_spec = self.spec.STAGES
         self.num_stages = self.spec.STAGES.NUM_STAGES
         num_channels_last = [256]
+        self.num_limbs = cfg.DATASET.NUM_LIMBS
+        self.keypoint_groups = cfg.DATASET.KEYPOINT_GROUPS
         for i in range(self.num_stages):
             num_channels = self.stages_spec.NUM_CHANNELS[i]
             transition_layer = \
@@ -87,6 +89,8 @@ class PoseHigherResolutionNet(nn.Module):
         self.head_heatmap = self._make_heatmap_head(config_heatmap)
         self.offset_feature_layers, self.offset_final_layer = \
             self._make_separete_regression_head(config_offset)
+        self.offset_limbs_feature_layers, self.offset_limbs_final_layer = \
+            self._make_separete_limbs_regression_head(config_offset)
 
         self.pretrained_layers = self.spec.PRETRAINED_LAYERS
 
@@ -137,6 +141,33 @@ class PoseHigherResolutionNet(nn.Module):
 
             offset_conv = nn.Conv2d(
                 in_channels=layer_config['NUM_CHANNELS_PERKPT'],
+                out_channels=2,
+                kernel_size=self.spec.FINAL_CONV_KERNEL,
+                stride=1,
+                padding=1 if self.spec.FINAL_CONV_KERNEL == 3 else 0
+            )
+            offset_final_layer.append(offset_conv)
+
+        return nn.ModuleList(offset_feature_layers), nn.ModuleList(offset_final_layer)
+
+    def _make_separete_limbs_regression_head(self, layer_config):
+        offset_feature_layers = []
+        offset_final_layer = []
+
+        for i in range(self.num_limbs):
+            # 用来生成肢体中心点偏移量的自适应卷积
+            # 输入和输出是：肢体中关键点的个数乘以每个关键点特征图的层数
+            feature_conv = self._make_layer(
+                blocks_dict[layer_config['BLOCK']],
+                layer_config['NUM_CHANNELS_PERKPT']*len(self.keypoint_groups[i]),
+                layer_config['NUM_CHANNELS_PERKPT']*len(self.keypoint_groups[i]),
+                layer_config['NUM_BLOCKS'],
+                dilation=layer_config['DILATION_RATE']
+            )
+            offset_feature_layers.append(feature_conv)
+
+            offset_conv = nn.Conv2d(
+                in_channels=layer_config['NUM_CHANNELS_PERKPT']*len(self.keypoint_groups[i]),
                 out_channels=2,
                 kernel_size=self.spec.FINAL_CONV_KERNEL,
                 stride=1,
@@ -247,6 +278,16 @@ class PoseHigherResolutionNet(nn.Module):
             num_inchannels = modules[-1].get_num_inchannels()
 
         return nn.Sequential(*modules), num_inchannels
+    def _get_index_by_val(self, val):
+        dim1, dim2 = 99, 99
+        for i, ks in enumerate(self.keypoint_groups):
+            for j, value in enumerate(ks):
+                if value == val:
+                    dim1, dim2 = i, j
+                    break
+        return dim1, dim2
+
+
 
     def forward(self, x):
         x = self.conv1(x)
@@ -279,15 +320,42 @@ class PoseHigherResolutionNet(nn.Module):
 
         final_offset = []
         offset_feature = self.transition_offset(x)
+        # 用于存放肢体的输出特征图
+        limbs_out_feature = []
+        # 用于存放肢体的输出的偏移量
+        final_limbs_offset = []
+        # 循环肢体个数
+        for i in range(self.num_limbs):
+            limbs_in_feature = []
+            # 遍历每个肢体中包含的关键点索引
+            for idx in self.keypoint_groups[i]:
+                # 根据关键点索引获取肢体中心点的输入特征图
+                limbs_in_feature.append(offset_feature[:, idx*self.offset_prekpt:(idx+1)*self.offset_prekpt])
+            # 合并处理
+            limbs_in_feature = torch.cat(limbs_in_feature, dim=1)
+            # 求得输出特征图
+            limbs_out_feature.append(self.offset_limbs_feature_layers[i](limbs_in_feature))
+            # 求得每个肢体中心点最终的偏移量
+            final_limbs_offset.append(self.offset_limbs_final_layer[i](limbs_out_feature[i]))
+        # 合并最终偏移量
+        limbs_offset = torch.cat(final_limbs_offset, dim=1)
+
+        # 将肢体中心关键点处理的特征图作为求关键点偏移量的输入特征，但是由于顺序不一样，所以要调整一下数据。
+        # for i in range(self.num_limbs):
+        #     for idx, keypoint_idx in enumerate(self.keypoint_groups[i]):
+        #          offset_feature[:, keypoint_idx*self.offset_prekpt:(keypoint_idx+1)*self.offset_prekpt] = \
+        #              limbs_out_feature[i][:, idx*self.offset_prekpt:(idx+1)*self.offset_prekpt]
 
         for j in range(self.num_joints):
+            # 通过值获取索引
+            dim1, dim2 = self._get_index_by_val(j)
             final_offset.append(
                 self.offset_final_layer[j](
                     self.offset_feature_layers[j](
-                        offset_feature[:,j*self.offset_prekpt:(j+1)*self.offset_prekpt])))
+                        limbs_out_feature[dim1][:, dim2*self.offset_prekpt:(dim2+1)*self.offset_prekpt])))
 
         offset = torch.cat(final_offset, dim=1)
-        return heatmap, offset
+        return heatmap, offset, limbs_offset
 
     def init_weights(self, pretrained='', verbose=True):
         logger.info('=> init weights from normal distribution')

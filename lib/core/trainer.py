@@ -30,18 +30,20 @@ def do_train(cfg, model, data_loader, loss_factory, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (image, heatmap, mask, offset, offset_w) in enumerate(data_loader):
+    for i, (image, heatmap, mask, offset, offset_w, limbs_offset, limbs_weight) in enumerate(data_loader):
         data_time.update(time.time() - end)
 
-        pheatmap, poffset = model(image)
+        pheatmap, poffset, loffset = model(image)
 
         heatmap = heatmap.cuda(non_blocking=True)
         mask = mask.cuda(non_blocking=True)
         offset = offset.cuda(non_blocking=True)
         offset_w = offset_w.cuda(non_blocking=True)
+        limbs_offset = limbs_offset.cuda(non_blocking=True)
+        limbs_weight = limbs_weight.cuda(non_blocking=True)
 
         heatmap_loss, offset_loss = \
-            loss_factory(pheatmap, poffset, heatmap, mask, offset, offset_w)
+            loss_factory(pheatmap, poffset, loffset, heatmap, mask, offset, offset_w, limbs_offset, limbs_weight)
 
         loss = 0
         if heatmap_loss is not None:

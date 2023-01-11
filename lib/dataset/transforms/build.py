@@ -25,6 +25,10 @@ FLIP_CONFIG = {
     ],
     'CROWDPOSE_WITH_CENTER': [
         1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 12, 13, 14
+    ],
+    # 2023年1月2日21:15:21 增加CROWDPOSE_WITH_CENTER_AND_LIMBS，对肢体中心点也进行翻转。
+    'CROWDPOSE_WITH_CENTER_AND_LIMBS': [
+        1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 12, 13, 14, 16, 15, 18, 17, 19
     ]
 }
 
@@ -39,7 +43,8 @@ def build_transforms(cfg, is_train=True):
     else:
         raise ValueError('Please implement flip_index \
             for new dataset: %s.' % cfg.DATASET.DATASET)
-    coco_flip_index = FLIP_CONFIG[dataset_name + '_WITH_CENTER']
+    # 2023年1月2日21:13:16 在FLIP_CONFIG中增加CROWDPOSE_WITH_CENTER_AND_LIMBS，对肢体中心点也进行翻转。
+    coco_flip_index = FLIP_CONFIG[dataset_name + '_WITH_CENTER_AND_LIMBS']
 
     transforms = T.Compose(
         [

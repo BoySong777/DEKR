@@ -78,7 +78,9 @@ class RandomAffineTransform(object):
     def __init__(self,
                  input_size,
                  output_size,
+                 # 旋转角度
                  max_rotation,
+                 # 缩放
                  min_scale,
                  max_scale,
                  scale_type,
@@ -157,6 +159,7 @@ class RandomAffineTransform(object):
             center[1] += dy
 
         for i, _output_size in enumerate(self.output_size):
+            # mat_output是仿射变换的计算矩阵
             mat_output, _ = self._get_affine_matrix(
                 center, scale, (_output_size, _output_size), aug_rot
             )

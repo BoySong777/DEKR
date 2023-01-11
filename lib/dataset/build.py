@@ -24,6 +24,8 @@ from .CrowdPoseKeypoints import CrowdPoseKeypoints as crowd_pose_kpt
 from .transforms import build_transforms
 from .target_generators import HeatmapGenerator
 from .target_generators import OffsetGenerator
+from .target_generators import JointsOffsetGenerator
+from .target_generators import LimbsOffsetGenerator
 
 
 def build_dataset(cfg, is_train):
@@ -48,13 +50,22 @@ def build_dataset(cfg, is_train):
     offset_generator = OffsetGenerator(
         cfg.DATASET.OUTPUT_SIZE, cfg.DATASET.OUTPUT_SIZE,
         cfg.DATASET.NUM_JOINTS, cfg.DATASET.OFFSET_RADIUS
-    ) 
+    )
+    joints_offset_generator = JointsOffsetGenerator(
+        cfg.DATASET.OUTPUT_SIZE, cfg.DATASET.OUTPUT_SIZE,
+        cfg.DATASET.NUM_JOINTS, cfg.DATASET.OFFSET_RADIUS, limbs_groups=cfg.DATASET.KEYPOINT_GROUPS
+    )
+    limbs_offset_generator = LimbsOffsetGenerator(
+        cfg.DATASET.OUTPUT_SIZE, cfg.DATASET.OUTPUT_SIZE,
+        cfg.DATASET.NUM_JOINTS, cfg.DATASET.OFFSET_RADIUS
+    )
 
     dataset = eval(cfg.DATASET.DATASET)(
         cfg,
         cfg.DATASET.TRAIN,
         heatmap_generator,
-        offset_generator,
+        joints_offset_generator,
+        limbs_offset_generator,
         transforms
     )
 
